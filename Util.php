@@ -20,13 +20,23 @@ class Database
     const RESULT_INFO_UPDATE_FAILED = 4;
     const RESULT_INFO_DELETE_SUCCESS = 5;
     const RESULT_INFO_DELETE_FAILED = 6;
+    const RESULT_INFO_FIND_FAILED = 8;
+
+    const DEFAULT_DB_QUERY_PAGE = -1;
+    const DEFAULT_DB_QUERY_NUM_IN_PAGE = -1;
+
+    const CREATE = 11;
+    const READ = 12;
+    const UPDATE = 13;
+    const DELETE = 14;
+
 
     private $DATABASE_NAME;
 
     private $connection;
     private $result;
 
-    private $reflct;
+    private $reflect;
 
     function __construct($db_name=self::DEFAULT_DATABASE_NAME)
     {    // 构造函数
@@ -40,8 +50,8 @@ class Database
     public function insert($entity)
     {
         $clz = get_class($entity);
-        $this->reflct = new ReflectionClass($clz);
-        $properties = $this->reflct->getProperties();
+        $this->reflect = new ReflectionClass($clz);
+        $properties = $this->reflect->getProperties();
 
         $tableNameInSQL = $clz;
 
@@ -53,14 +63,12 @@ class Database
             $propertyValue = $entity->$propertyName;
 
             $sql_pre = $sql_pre.$propertyName.",";
-            $sql_post = $sql_post.$propertyValue.",";
+            $sql_post = $sql_post."'".$propertyValue."',";
         }
 
         $sql_pre = substr($sql_pre,0,-1);
         $sql_post = substr($sql_post,0,-1).")";
         $sql = $sql_pre.$sql_post;
-
-        $sql = "INSERT INTO travel.province (id,name,info) VALUE (1,'测试省份','测试信息')";
 
         if ($this->connection->query($sql) === TRUE)
             return self::RESULT_INFO_INSERT_SUCCESS;
@@ -70,19 +78,138 @@ class Database
 
     public function update($entity)
     {
+        $clz = get_class($entity);
+        $this->reflect = new ReflectionClass($clz);
+        $properties = $this->reflect->getProperties();
 
+        $tableNameInSQL = $clz;
+
+        $sql_pre = "UPDATE ".strtolower($tableNameInSQL)." SET ";
+        $sql_post = "WHERE id = ";
+
+        foreach ($properties as $property) {
+            $propertyName = $property->getName();
+            $propertyValue = $entity->$propertyName;
+
+            if ($propertyValue == null) continue;
+
+            if ($propertyName == "id") $sql_post = $sql_post."'".$propertyValue."'";
+            else $sql_pre = $sql_pre.$propertyName." = '".$propertyValue."' ,";
+        }
+
+        $sql_pre = substr($sql_pre,0,-1);
+        $sql = $sql_pre.$sql_post;
+
+        if ($this->connection->query($sql) === TRUE)
+            return self::RESULT_INFO_UPDATE_SUCCESS;
+        else
+            return self::RESULT_INFO_UPDATE_FAILED;
     }
 
     public function delete($entity)
     {
+        $clz = get_class($entity);
+        $this->reflect = new ReflectionClass($clz);
+        $properties = $this->reflect->getProperties();
 
+        $tableNameInSQL = $clz;
+
+        $sql = "DELETE FROM ".strtolower($tableNameInSQL)." WHERE id = ";
+
+        foreach ($properties as $property) {
+            $propertyName = $property->getName();
+            $propertyValue = $entity->$propertyName;
+
+            if ($propertyName == "id") $sql = $sql."'".$propertyValue."'";
+        }
+
+        if ($this->connection->query($sql) === TRUE)
+            return self::RESULT_INFO_DELETE_SUCCESS;
+        else
+            return self::RESULT_INFO_DELETE_FAILED;
     }
 
-    public function find($entity)
+    public function find($entity,$page = self::DEFAULT_DB_QUERY_PAGE,$num = self::DEFAULT_DB_QUERY_NUM_IN_PAGE)
     {
+        $clz = get_class($entity);
+        $this->reflect = new ReflectionClass($clz);
+        $properties = $this->reflect->getProperties();
+
+        $tableNameInSQL = $clz;
+
+        $sql_pre = "SELECT ";
+        $sql_post = " FROM ".strtolower($tableNameInSQL)." WHERE 1 = 1";
+
+        foreach ($properties as $property)
+        {
+            $propertyName = $property->getName();
+            $propertyValue = $entity->$propertyName;
+
+            $sql_pre = $sql_pre.$propertyName.", ";
+
+            if ($propertyValue == null) continue;
+
+            $sql_post = $sql_post." AND ".$propertyName." = '".$propertyValue."'";
+        }
+
+        $sql_pre = substr($sql_pre,0,-2);
+        $sql = $sql_pre.$sql_post;
+
+        if ($page != self::DEFAULT_DB_QUERY_NUM_IN_PAGE || $num != self::DEFAULT_DB_QUERY_NUM_IN_PAGE)
+        {
+            $sql = $sql." limit ".($page-1)*$num.",".$num;
+        }
+
+        $this->result = $this->connection->query($sql);
+
+        if (!$this->result)
+            return self::RESULT_INFO_FIND_FAILED;
+        else
+        {
+            $fetchResults = $this->result->fetch_all(MYSQLI_ASSOC);
+            $result = array();
+            foreach ($fetchResults as $fetchResult)
+            {
+                $id = null;
+                $entity = $this->reflect->newInstance();
+                foreach ($properties as $property)
+                {
+                    $propertyName = $property->getName();
+                    if ($propertyName == "id") $id = $fetchResult["$propertyName"];
+                    $entity->$propertyName = $fetchResult["$propertyName"];
+                }
+                $result[$id] = $entity;
+            }
+            return $this->result;
+        }
 
     }
 
+    public function nativeSql($sql,$type,$entity)
+    {
+        switch ($type)
+        {
+            case 11:
+
+                break;
+
+            case 12:
+
+                break;
+
+            case 13:
+
+                break;
+
+            case 14:
+
+                break;
+
+            default:
+
+                break;
+        }
+    }
 
     public function setDatabaseName($databaseName)
     {

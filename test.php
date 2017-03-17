@@ -11,14 +11,14 @@ include "entity/Province.php";
 
 
 $p = new province();
-$p->id = 2;
+$p->id = 1;
 $p->name = "测试省份";
-$p->info = "message";
+$p->num = 3;
 
 
 $t = new Database();
 
 
-$result = $t->insert($p);
+$result = $t->find($p,2,2);
 
-echo $result;
+//echo "\n".$result."\n";
