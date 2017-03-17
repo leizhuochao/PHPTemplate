@@ -10,15 +10,30 @@ include "Util.php";
 include "entity/Province.php";
 
 
-$p = new province();
-$p->id = 1;
-$p->name = "测试省份";
-$p->num = 3;
+$province = new province();
+$test_db_conn = new Database();
 
 
-$t = new Database();
+$results = $test_db_conn->find($province,1,1);
 
+echo "\n";
+//print_r($result[3]);
+//foreach ($results as $result){
+//    //echo $key."\t";
+//    print_r($result);
+//}
 
-$result = $t->find($p,2,2);
+//for ($i = 0 ; $i < 10 ; $i++){
+//    if (!$results[$i]) continue;
+//    echo $i."\t";
+//    print_r($results[$i]);
+//}
 
-//echo "\n".$result."\n";
+$C = " create xxx";
+$R = " select xxx";
+$U = " update xxx";
+$D = " delete xxx";
+
+echo $test_db_conn->nativeSql($D);
+
+echo "\n";

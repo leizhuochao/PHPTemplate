@@ -25,18 +25,21 @@ class Database
     const DEFAULT_DB_QUERY_PAGE = -1;
     const DEFAULT_DB_QUERY_NUM_IN_PAGE = -1;
 
+    const TYPE_NULL = 10;
     const CREATE = 11;
     const READ = 12;
     const UPDATE = 13;
     const DELETE = 14;
+    const TYPE_OTHER = 15;
 
 
-    private $DATABASE_NAME;
+    private $DATABASE_NAME = null;
 
-    private $connection;
-    private $result;
+    private $connection = null;
+    private $results = null;
+    private $return_info = null;
 
-    private $reflect;
+    private $reflect = null;
 
     function __construct($db_name=self::DEFAULT_DATABASE_NAME)
     {    // 构造函数
@@ -71,9 +74,10 @@ class Database
         $sql = $sql_pre.$sql_post;
 
         if ($this->connection->query($sql) === TRUE)
-            return self::RESULT_INFO_INSERT_SUCCESS;
+            $this->return_info = self::RESULT_INFO_INSERT_SUCCESS;
         else
-            return self::RESULT_INFO_INSERT_FAILED;
+            $this->return_info = self::RESULT_INFO_INSERT_FAILED;
+        return $this->return_info;
     }
 
     public function update($entity)
@@ -101,9 +105,10 @@ class Database
         $sql = $sql_pre.$sql_post;
 
         if ($this->connection->query($sql) === TRUE)
-            return self::RESULT_INFO_UPDATE_SUCCESS;
+            $this->return_info = self::RESULT_INFO_UPDATE_SUCCESS;
         else
-            return self::RESULT_INFO_UPDATE_FAILED;
+            $this->return_info = self::RESULT_INFO_UPDATE_FAILED;
+        return $this->return_info;
     }
 
     public function delete($entity)
@@ -124,12 +129,13 @@ class Database
         }
 
         if ($this->connection->query($sql) === TRUE)
-            return self::RESULT_INFO_DELETE_SUCCESS;
+            $this->return_info = self::RESULT_INFO_DELETE_SUCCESS;
         else
-            return self::RESULT_INFO_DELETE_FAILED;
+            $this->return_info = self::RESULT_INFO_DELETE_FAILED;
+        return $this->return_info;
     }
 
-    public function find($entity,$page = self::DEFAULT_DB_QUERY_PAGE,$num = self::DEFAULT_DB_QUERY_NUM_IN_PAGE)
+    public function find($entity,$query_page = self::DEFAULT_DB_QUERY_PAGE,$query_num = self::DEFAULT_DB_QUERY_NUM_IN_PAGE)
     {
         $clz = get_class($entity);
         $this->reflect = new ReflectionClass($clz);
@@ -155,19 +161,19 @@ class Database
         $sql_pre = substr($sql_pre,0,-2);
         $sql = $sql_pre.$sql_post;
 
-        if ($page != self::DEFAULT_DB_QUERY_NUM_IN_PAGE || $num != self::DEFAULT_DB_QUERY_NUM_IN_PAGE)
+        if ($query_page != self::DEFAULT_DB_QUERY_NUM_IN_PAGE || $query_num != self::DEFAULT_DB_QUERY_NUM_IN_PAGE)
         {
-            $sql = $sql." limit ".($page-1)*$num.",".$num;
+            $sql = $sql." limit ".($query_page-1) * $query_num.",".$query_num;
         }
 
-        $this->result = $this->connection->query($sql);
+        $this->results = $this->connection->query($sql);
 
-        if (!$this->result)
+        if (!$this->results)
             return self::RESULT_INFO_FIND_FAILED;
         else
         {
-            $fetchResults = $this->result->fetch_all(MYSQLI_ASSOC);
-            $result = array();
+            $fetchResults = $this->results->fetch_all(MYSQLI_ASSOC);
+            $results = array();
             foreach ($fetchResults as $fetchResult)
             {
                 $id = null;
@@ -178,37 +184,63 @@ class Database
                     if ($propertyName == "id") $id = $fetchResult["$propertyName"];
                     $entity->$propertyName = $fetchResult["$propertyName"];
                 }
-                $result[$id] = $entity;
+                $results[$id] = $entity;
             }
-            return $this->result;
+            return $this->results;
         }
-
     }
 
-    public function nativeSql($sql,$type,$entity)
+    public function nativeSql($sql,$entity = NULL,$type_in_native_sql = self::TYPE_NULL)
     {
-        switch ($type)
+        $sql = trim($sql);
+        $sql_type = strtolower(explode(" ",$sql)[0]);
+
+        if ($type_in_native_sql == self::TYPE_NULL){
+            switch ($sql_type)
+            {
+                case "create": $type_in_native_sql = self::CREATE; break;
+                case "select": $type_in_native_sql = self::READ; break;
+                case "update": $type_in_native_sql = self::UPDATE; break;
+                case "delete": $type_in_native_sql = self::DELETE; break;
+                default: $type_in_native_sql = self::TYPE_OTHER; break;
+            }
+        }
+
+        switch ($type_in_native_sql)
         {
-            case 11:
+            case self::CREATE:
+                if ($this->connection->query($sql) === TRUE)
+                    $this->return_info = self::RESULT_INFO_INSERT_SUCCESS;
+                else
+                    $this->return_info = self::RESULT_INFO_INSERT_FAILED;
+                break;
+
+            case self::READ:
 
                 break;
 
-            case 12:
-
+            case self::UPDATE:
+                if ($this->connection->query($sql) === TRUE)
+                    $this->return_info = self::RESULT_INFO_UPDATE_SUCCESS;
+                else
+                    $this->return_info = self::RESULT_INFO_UPDATE_FAILED;
                 break;
 
-            case 13:
-
+            case self::DELETE:
+                if ($this->connection->query($sql) === TRUE)
+                    $this->return_info = self::RESULT_INFO_DELETE_SUCCESS;
+                else
+                    $this->return_info = self::RESULT_INFO_DELETE_FAILED;
                 break;
 
-            case 14:
+            case self::TYPE_OTHER:
 
                 break;
-
             default:
 
                 break;
         }
+        return $this->return_info;
     }
 
     public function setDatabaseName($databaseName)
